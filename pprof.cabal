@@ -1,0 +1,69 @@
+cabal-version:      3.0
+name:               pprof
+version:            0.1.0.0
+synopsis:           Writer for Google's pprof profile format
+description:
+    Build and gzip-encode profiles in Google's pprof format
+    (@profile.proto@) for tools such as Speedscope, Pyroscope, and
+    Parca.
+    .
+    Targets symbolicated profiles: frames carry resolved function
+    names, and a single placeholder mapping is emitted in lieu of
+    real address-space mappings. Suited to language-level profilers;
+    not intended for emitting unsymbolicated native profiles.
+    .
+    Handles string interning, function and location deduplication,
+    and gzip compression.
+
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Brian McKenna
+maintainer:         brian@brianmckenna.org
+build-type:         Simple
+extra-source-files:
+    proto/pprof/profile.proto
+    scripts/regen-proto.sh
+    test/golden/go.crc32.cpu.pb.gz
+
+library
+    ghc-options:        -Wall
+    hs-source-dirs:     src
+    default-language:   Haskell2010
+    default-extensions: OverloadedStrings
+    exposed-modules:
+        Data.Pprof
+        Data.Pprof.Builder
+        Data.Pprof.Types
+        Proto.Pprof.Profile
+        Proto.Pprof.Profile_Fields
+    build-depends:
+        base                >= 4.18  && < 5,
+        bytestring          >= 0.11,
+        containers          >= 0.6,
+        text                >= 2.0,
+        transformers        >= 0.5,
+        proto-lens          >= 0.7,
+        proto-lens-runtime  >= 0.7,
+        zlib                >= 0.6
+
+test-suite pprof-test
+    ghc-options:        -Wall
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     test
+    main-is:            Main.hs
+    default-language:   Haskell2010
+    default-extensions: OverloadedStrings
+    other-modules:
+        Test.Data.Pprof.Builder
+        Test.Data.Pprof.Gen
+        Test.Data.Pprof.Golden
+    build-depends:
+        base,
+        bytestring,
+        containers,
+        text,
+        pprof,
+        proto-lens,
+        proto-lens-runtime,
+        zlib,
+        hedgehog            >= 1.4

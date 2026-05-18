@@ -1,0 +1,7 @@
+pprof — a writer for Google's pprof profile format
+
+Copyright 2026 Brian McKenna
+
+The protocol buffer schema in proto/pprof/profile.proto is taken from the
+google/pprof project (Copyright 2016 Google Inc.) and is used under the
+terms of the Apache License, Version 2.0.
