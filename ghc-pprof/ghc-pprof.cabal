@@ -1,0 +1,51 @@
+cabal-version:      3.0
+name:               ghc-pprof
+version:            0.1.0.0
+synopsis:           Live pprof profiles of a running GHC application
+description:
+    Sampling profiler for a running GHC program. Periodically clones
+    each live thread's stack via "GHC.Stack.CloneStack" and emits a
+    pprof profile suitable for tools such as Pyroscope, Parca, or
+    Speedscope.
+    .
+    The application and libraries being profiled must be compiled
+    with @-finfo-table-map@ for stack decoding to produce frames.
+
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Brian McKenna
+maintainer:         brian@brianmckenna.org
+build-type:         Simple
+
+library
+    ghc-options:        -Wall
+    hs-source-dirs:     src
+    default-language:   Haskell2010
+    exposed-modules:
+        GHC.Pprof.Live
+        GHC.Pprof.Live.Internal
+        GHC.Pprof.Live.OpenTelemetry
+        GHC.Pprof.Live.Threads
+    build-depends:
+        base                  >= 4.18  && < 5,
+        bytestring            >= 0.11,
+        containers            >= 0.6,
+        hs-opentelemetry-api  >= 0.3,
+        memory                >= 0.18,
+        text                  >= 2.0,
+        time                  >= 1.12,
+        pprof                 >= 0.1
+
+test-suite spec
+    type:               exitcode-stdio-1.0
+    main-is:            Main.hs
+    hs-source-dirs:     test
+    default-language:   Haskell2010
+    ghc-options:        -Wall -threaded -finfo-table-map -with-rtsopts=-N
+    build-depends:
+        base,
+        bytestring,
+        ghc-pprof,
+        hedgehog              >= 1.4,
+        hs-opentelemetry-api  >= 0.3,
+        hs-opentelemetry-sdk  >= 0.1
