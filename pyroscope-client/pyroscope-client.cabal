@@ -1,0 +1,42 @@
+cabal-version:      3.0
+name:               pyroscope-client
+version:            0.1.0.0
+synopsis:           Client for the Pyroscope API
+description:
+    HTTP client for Pyroscope.
+
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Brian McKenna
+maintainer:         brian@brianmckenna.org
+build-type:         Simple
+
+library
+    ghc-options:        -Wall
+    hs-source-dirs:     src
+    default-language:   Haskell2010
+    exposed-modules:
+        Network.Pyroscope.Client
+        Network.Pyroscope.Client.Internal
+        Network.Pyroscope.Client.Types
+    build-depends:
+        base                >= 4.18  && < 5,
+        bytestring          >= 0.11,
+        http-client         >= 0.7,
+        http-client-tls     >= 0.3,
+        http-types          >= 0.12,
+        lens-family         >= 2.0,
+        text                >= 2.0
+
+test-suite pyroscope-client-test
+    ghc-options:        -Wall
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     test
+    main-is:            Main.hs
+    default-language:   Haskell2010
+    build-depends:
+        base,
+        bytestring,
+        text,
+        pyroscope-client,
+        hedgehog            >= 1.4
