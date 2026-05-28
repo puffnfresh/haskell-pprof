@@ -12,6 +12,10 @@ If all you want is to drop continuous profiling into a Haskell service, depend o
 
 This will inflate your binary size by a significant amount. The `-finfo-table-map` flag adds a large `.ipe` section with module names, function names, file names and line numbers of everything. The GHC user's guide says the overhead is around 200 MB on a project the size of GHC itself; expect less for your application, but some cost on shipping your binaries.
 
+It also imposes a runtime CPU cost. On each tick (100 times per second by default), the sampling thread iterates over every live Haskell thread, calls `cloneThreadStack` to copy that thread's stack, and decodes each frame by looking it up in the IPE map. So per-sample cost scales with the number of live threads and the depth of their stacks; per-second cost scales with the sample rate.
+
+On a single-threaded CPU-bound workload at the default 100 Hz, the agent costs roughly **2% CPU**. Multi-threaded workloads will see more, since the sampler walks every live Haskell thread on each tick. For workloads that fall outside that envelope, reduce `configSampleRateHz` or restrict sampling to a subset of threads via `threadSelector`.
+
 ## Requirements
 
 One GHC flag is required for stacks to symbolicate.
