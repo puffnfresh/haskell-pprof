@@ -3,10 +3,9 @@
 module Main where
 
 import Control.Monad (when)
-import Data.Int (Int64)
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.Int (Int64)
 import Data.Pprof.Time (nowNanos)
-import qualified Data.Text as T
 import Lens.Family2 ((&), (.~))
 import qualified Network.Pyroscope.GHC as Pyro
 import System.Environment (getArgs)
@@ -17,28 +16,19 @@ main ::
 main = do
   args <- getArgs
   case args of
-    [url, name, seconds] ->
-      agent (T.pack url) (T.pack name) (read seconds)
+    [seconds] ->
+      agent (read seconds)
     _ ->
-      die "usage: pyroscope-ghc-test <url> <app-name> <seconds>"
+      die "usage: pyroscope-ghc-test <seconds>"
 
 agent ::
-  T.Text ->
-  T.Text ->
   Int ->
   IO ()
-agent url name seconds = do
+agent seconds = do
   errors <- newIORef (0 :: Int)
+  base <- Pyro.configFromEnv
   let config =
-        Pyro.defaultConfig
-          & Pyro.configServerAddress
-          .~ url
-          & Pyro.configApplicationName
-          .~ name
-          & Pyro.configSampleRateHz
-          .~ 100
-          & Pyro.configUploadIntervalSeconds
-          .~ 3
+        base
           & Pyro.configOnUploadError
           .~ ( \e -> do
                  putStrLn ("upload error: " <> show e)

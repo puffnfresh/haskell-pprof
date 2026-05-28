@@ -21,6 +21,7 @@ library
         Network.Pyroscope.GHC
     build-depends:
         base                >= 4.18  && < 5,
+        bytestring          >= 0.12,
         ghc-pprof           >= 0.1,
         http-client         >= 0.7,
         lens-family         >= 2.0,

@@ -33,7 +33,13 @@ pkgs.testers.nixosTest {
     machine.wait_for_unit("pyroscope.service")
     machine.wait_for_open_port(4040)
     machine.wait_until_succeeds("curl -fsS http://localhost:4040/ready")
-    machine.succeed("pyroscope-ghc-test http://localhost:4040 pyroscope_ghc_test 15")
+    machine.succeed(
+      "PYROSCOPE_SERVER_ADDRESS=http://localhost:4040 "
+      "PYROSCOPE_APPLICATION_NAME=pyroscope_ghc_test "
+      "PYROSCOPE_SAMPLE_RATE=100 "
+      "PYROSCOPE_UPLOAD_RATE=3 "
+      "pyroscope-ghc-test 15"
+    )
 
     machine.wait_until_succeeds(
       "profilecli query series --url=http://localhost:4040 "
