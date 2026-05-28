@@ -16,6 +16,7 @@
         pprof = withIpe (hself.callPackage ./nix/pprof.nix { });
         ghc-pprof = withIpe (hself.callPackage ./nix/ghc-pprof.nix { });
         pyroscope-client = withIpe (hself.callPackage ./nix/pyroscope-client.nix { });
+        pyroscope-ghc = withIpe (hself.callPackage ./nix/pyroscope-ghc.nix { });
       };
 
       mkJailbreaks = pkgs: hsuper: {
@@ -46,8 +47,12 @@
             "--ghc-option=-finfo-table-map"
             "--ghc-option=-fdistinct-constructor-tables"
           ];
+          hpkgsIpe = pkgs.haskell.packages.ghc9141.override {
+            ghc = ghcIpe;
+            buildHaskellPackages = hpkgsIpe;
+          };
         in
-        (pkgs.haskell.packages.ghc9141.override { ghc = ghcIpe; }).extend
+        hpkgsIpe.extend
           (hself: hsuper: mkJailbreaks pkgs hsuper // mkLocals withIpe hself);
 
       treefmtFor = system:
@@ -67,10 +72,12 @@
           pprof = hpkgs.pprof;
           ghc-pprof = hpkgs.ghc-pprof;
           pyroscope-client = hpkgs.pyroscope-client;
+          pyroscope-ghc = hpkgs.pyroscope-ghc;
 
           pprof-ipe = hpkgsIpe.pprof;
           ghc-pprof-ipe = hpkgsIpe.ghc-pprof;
           pyroscope-client-ipe = hpkgsIpe.pyroscope-client;
+          pyroscope-ghc-ipe = hpkgsIpe.pyroscope-ghc;
 
           default = hpkgs.ghc-pprof;
         });
@@ -79,10 +86,15 @@
         let
           pkgs = pkgsFor system;
           hpkgs = hpkgsFor system;
+          hpkgsIpe = hpkgsIpeFor system;
         in
         pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           pyroscope-client-test = import ./nix/pyroscope-client-test {
             inherit pkgs hpkgs;
+          };
+          pyroscope-ghc-test = import ./nix/pyroscope-ghc-test {
+            inherit pkgs;
+            hpkgs = hpkgsIpe;
           };
         });
 
@@ -95,7 +107,7 @@
         in
         {
           default = hpkgs.shellFor {
-            packages = p: [ p.pprof p.ghc-pprof p.pyroscope-client ];
+            packages = p: [ p.pprof p.ghc-pprof p.pyroscope-client p.pyroscope-ghc ];
             nativeBuildInputs = [
               hpkgs.cabal-install
               hpkgs.proto-lens-protoc

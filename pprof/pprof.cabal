@@ -33,6 +33,7 @@ library
     exposed-modules:
         Data.Pprof
         Data.Pprof.Builder
+        Data.Pprof.Time
         Data.Pprof.Types
         Proto.Pprof.Profile
         Proto.Pprof.Profile_Fields
@@ -41,6 +42,7 @@ library
         bytestring          >= 0.11,
         containers          >= 0.6,
         text                >= 2.0,
+        time                >= 1.12,
         transformers        >= 0.5,
         proto-lens          >= 0.7,
         proto-lens-runtime  >= 0.7,

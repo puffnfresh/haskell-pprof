@@ -9,9 +9,10 @@ where
 import Control.Exception (SomeException, try)
 import Data.ByteString (ByteString)
 import Data.Pprof (Frame (..), ProfileMeta (..), addSample, encodeGzipped)
+import Data.Pprof.Time (nowNanos)
 import qualified Data.Text as T
 import GHC.Conc.Sync (ThreadId, listThreads, threadLabel)
-import GHC.Pprof.Live.Internal (nowNanos, toFrame)
+import GHC.Pprof.Live.Internal (toFrame)
 import GHC.Stack.CloneStack (cloneThreadStack, decode)
 
 captureThreadProfile ::

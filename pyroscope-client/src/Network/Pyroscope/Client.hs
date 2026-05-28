@@ -28,8 +28,10 @@ import Network.HTTP.Client
   ( Manager,
     Request,
     RequestBody (RequestBodyBS),
+    defaultManagerSettings,
     httpLbs,
     method,
+    newManager,
     parseRequest,
     path,
     requestBody,
@@ -38,7 +40,6 @@ import Network.HTTP.Client
     responseStatus,
     setQueryString,
   )
-import Network.HTTP.Client.TLS (getGlobalManager)
 import Network.HTTP.Types.Header (hContentType)
 import Network.HTTP.Types.Status (statusCode)
 import Network.Pyroscope.Client.Internal
@@ -67,7 +68,7 @@ send ::
   Upload ->
   IO (Either IngestError ())
 send ep up = do
-  mgr <- getGlobalManager
+  mgr <- newManager defaultManagerSettings
   sendWith mgr ep id up
 
 sendWith ::

@@ -9,8 +9,8 @@ import Data.Pprof
     addSample,
     encodeGzipped,
   )
+import Data.Pprof.Time (nowNanos)
 import qualified Data.Text as T
-import Data.Time.Clock.POSIX (getPOSIXTime)
 import Lens.Family2 ((&), (.~))
 import qualified Network.Pyroscope.Client as P
 import System.Environment (getArgs)
@@ -63,19 +63,13 @@ test url name = do
           & P.upEndNanos
           .~ endNanos
           & P.upSpyName
-          .~ Just "pyroscope-client-test"
+          .~ Just "pyroscope_client_test"
           & P.upSampleRateHz
           .~ Just 100
   result <- P.send ep up
   case result of
     Right () -> putStrLn "OK"
     Left e -> die (show e)
-
-nowNanos ::
-  IO Int64
-nowNanos = do
-  t <- getPOSIXTime
-  pure $! floor (realToFrac t * (1e9 :: Double) :: Double)
 
 oneSecondNanos ::
   Int64

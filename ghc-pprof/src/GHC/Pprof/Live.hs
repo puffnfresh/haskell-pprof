@@ -32,13 +32,13 @@ import Data.Int (Int64)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Pprof (Frame (..), Label, ProfileMeta (..), addSample, encodeGzipped)
+import Data.Pprof.Time (nowNanos)
 import Data.Text (Text)
 import GHC.Conc.Sync (listThreads, threadStatus)
 import GHC.Pprof.Live.Internal
   ( StackCounters (..),
     addCounters,
     classifyStatus,
-    nowNanos,
     toFrame,
   )
 import GHC.Stack.CloneStack (StackEntry, cloneThreadStack, decode)

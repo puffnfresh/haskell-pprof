@@ -2,3 +2,4 @@ packages:
   pprof/
   ghc-pprof/
   pyroscope-client/
+  pyroscope-ghc/

@@ -4,7 +4,6 @@ module GHC.Pprof.Live.Internal
     addCounters,
     classifyStatus,
     parseSrcLoc,
-    nowNanos,
     toFrame,
   )
 where
@@ -13,7 +12,6 @@ import Data.Int (Int64)
 import Data.Pprof (Frame (..))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time.Clock.POSIX (getPOSIXTime)
 import GHC.Conc.Sync (BlockReason (..), ThreadStatus (..))
 import GHC.Stack.CloneStack (StackEntry (..))
 
@@ -75,12 +73,6 @@ readLeadingInt str = case dropWhile (== '(') str of
   s -> case reads s :: [(Int64, String)] of
     ((n, _) : _) -> n
     _ -> 0
-
-nowNanos ::
-  IO Int64
-nowNanos = do
-  t <- getPOSIXTime
-  pure $! floor (realToFrac t * (1e9 :: Double) :: Double)
 
 toFrame ::
   StackEntry ->

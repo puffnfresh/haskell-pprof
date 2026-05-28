@@ -1,0 +1,29 @@
+cabal-version:      3.0
+name:               pyroscope-ghc
+version:            0.1.0.0
+synopsis:           Pyroscope agent for GHC applications
+description:
+    Background agent that samples a running GHC program with
+    ghc-pprof and uploads the resulting pprof profiles to a
+    Pyroscope server on an interval.
+
+license:            Apache-2.0
+license-file:       LICENSE
+author:             Brian McKenna
+maintainer:         brian@brianmckenna.org
+build-type:         Simple
+
+library
+    ghc-options:        -Wall
+    hs-source-dirs:     src
+    default-language:   Haskell2010
+    exposed-modules:
+        Network.Pyroscope.GHC
+    build-depends:
+        base                >= 4.18  && < 5,
+        ghc-pprof           >= 0.1,
+        http-client         >= 0.7,
+        lens-family         >= 2.0,
+        pprof               >= 0.1,
+        pyroscope-client    >= 0.1,
+        text                >= 2.0
