@@ -47,6 +47,7 @@ import GHC.Pprof.Live
     stopProfiler,
   )
 import qualified GHC.Pprof.Live.Labels as Labels
+import GHC.Pprof.Live.OpenTelemetry (openTelemetryLabels)
 import Lens.Family2 (Lens', (&), (.~), (^.))
 import Network.HTTP.Client
   ( Manager,
@@ -116,7 +117,7 @@ defaultConfig =
     10
     id
     (const (pure ()))
-    (const (pure []))
+    openTelemetryLabels
 
 configFromEnv ::
   IO Config
