@@ -10,6 +10,7 @@ module Network.Pyroscope.GHC
     configRequestModifier,
     configOnUploadError,
     configLabelCollector,
+    configTags,
     defaultConfig,
     configFromEnv,
     Pyroscope,
@@ -27,6 +28,8 @@ import Control.Exception (bracket, mask_)
 import qualified Data.ByteString.Char8 as BS8
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Pprof (Label)
 import Data.Pprof.Time (nowNanos)
 import Data.Text (Text)
@@ -71,41 +74,47 @@ data Config
       !(Request -> Request)
       !(P.IngestError -> IO ())
       !(ThreadId -> IO [Label])
+      !(Map Text Text)
 
 configServerAddress ::
   Lens' Config Text
-configServerAddress f (Config s n h i m e l) =
-  (\s' -> Config s' n h i m e l) <$> f s
+configServerAddress f (Config s n h i m e l t) =
+  (\s' -> Config s' n h i m e l t) <$> f s
 
 configApplicationName ::
   Lens' Config Text
-configApplicationName f (Config s n h i m e l) =
-  (\n' -> Config s n' h i m e l) <$> f n
+configApplicationName f (Config s n h i m e l t) =
+  (\n' -> Config s n' h i m e l t) <$> f n
 
 configSampleRateHz ::
   Lens' Config Int
-configSampleRateHz f (Config s n h i m e l) =
-  (\h' -> Config s n h' i m e l) <$> f h
+configSampleRateHz f (Config s n h i m e l t) =
+  (\h' -> Config s n h' i m e l t) <$> f h
 
 configUploadIntervalSeconds ::
   Lens' Config Int
-configUploadIntervalSeconds f (Config s n h i m e l) =
-  (\i' -> Config s n h i' m e l) <$> f i
+configUploadIntervalSeconds f (Config s n h i m e l t) =
+  (\i' -> Config s n h i' m e l t) <$> f i
 
 configRequestModifier ::
   Lens' Config (Request -> Request)
-configRequestModifier f (Config s n h i m e l) =
-  (\m' -> Config s n h i m' e l) <$> f m
+configRequestModifier f (Config s n h i m e l t) =
+  (\m' -> Config s n h i m' e l t) <$> f m
 
 configOnUploadError ::
   Lens' Config (P.IngestError -> IO ())
-configOnUploadError f (Config s n h i m e l) =
-  (\e' -> Config s n h i m e' l) <$> f e
+configOnUploadError f (Config s n h i m e l t) =
+  (\e' -> Config s n h i m e' l t) <$> f e
 
 configLabelCollector ::
   Lens' Config (ThreadId -> IO [Label])
-configLabelCollector f (Config s n h i m e l) =
-  Config s n h i m e <$> f l
+configLabelCollector f (Config s n h i m e l t) =
+  (\l' -> Config s n h i m e l' t) <$> f l
+
+configTags ::
+  Lens' Config (Map Text Text)
+configTags f (Config s n h i m e l t) =
+  Config s n h i m e l <$> f t
 
 defaultConfig ::
   Config
@@ -118,6 +127,7 @@ defaultConfig =
     id
     (const (pure ()))
     openTelemetryLabels
+    Map.empty
 
 configFromEnv ::
   IO Config
@@ -264,10 +274,12 @@ uploadAll config mgr startNs endNs rotated = do
       config ^. configRequestModifier
     onErr =
       config ^. configOnUploadError
+    taggedName =
+      renderAppName (config ^. configApplicationName) (config ^. configTags)
     uploadOne profile = do
       let up =
             P.defaultUpload
-              & P.upAppName .~ (config ^. configApplicationName)
+              & P.upAppName .~ taggedName
               & P.upProfile .~ profile
               & P.upStartNanos .~ startNs
               & P.upEndNanos .~ endNs
@@ -277,3 +289,17 @@ uploadAll config mgr startNs endNs rotated = do
       case result of
         Right () -> pure ()
         Left e -> onErr e
+
+renderAppName ::
+  Text ->
+  Map Text Text ->
+  Text
+renderAppName name tags =
+  name <> suffix
+  where
+    suffix =
+      if Map.null tags
+        then ""
+        else "{" <> T.intercalate "," (renderTag <$> Map.toAscList tags) <> "}"
+    renderTag (k, v) =
+      k <> "=" <> v

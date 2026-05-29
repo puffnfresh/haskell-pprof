@@ -1,6 +1,7 @@
 { mkDerivation
 , base
 , bytestring
+, containers
 , ghc-pprof
 , http-client
 , lens-family
@@ -16,6 +17,7 @@ mkDerivation {
   libraryHaskellDepends = [
     base
     bytestring
+    containers
     ghc-pprof
     http-client
     lens-family
