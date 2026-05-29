@@ -30,6 +30,7 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (mapMaybe)
 import Data.Pprof (Label)
 import Data.Pprof.Time (nowNanos)
 import Data.Text (Text)
@@ -138,6 +139,21 @@ configFromEnv = do
     >>= overrideFromEnv configApplicationName (Just . T.pack) "PYROSCOPE_APPLICATION_NAME"
     >>= overrideFromEnv configSampleRateHz readMaybe "PYROSCOPE_SAMPLE_RATE"
     >>= overrideFromEnv configUploadIntervalSeconds readMaybe "PYROSCOPE_UPLOAD_RATE"
+    >>= overrideFromEnv configTags (Just . parseTagsEnv) "PYROSCOPE_LABELS"
+
+parseTagsEnv ::
+  String ->
+  Map Text Text
+parseTagsEnv =
+  Map.fromList . mapMaybe parsePair . T.splitOn "," . T.pack
+  where
+    parsePair pair =
+      case T.splitOn "=" pair of
+        [k, v] ->
+          let tk = T.strip k
+           in if T.null tk then Nothing else Just (tk, T.strip v)
+        _ ->
+          Nothing
 
 overrideFromEnv ::
   Lens' Config a ->
