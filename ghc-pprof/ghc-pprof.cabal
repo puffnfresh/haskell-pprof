@@ -24,6 +24,7 @@ library
     exposed-modules:
         GHC.Pprof.Live
         GHC.Pprof.Live.Internal
+        GHC.Pprof.Live.Labels
         GHC.Pprof.Live.OpenTelemetry
         GHC.Pprof.Live.Threads
     build-depends:

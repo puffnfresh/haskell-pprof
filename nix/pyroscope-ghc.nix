@@ -1,5 +1,6 @@
 { mkDerivation
 , base
+, bytestring
 , ghc-pprof
 , http-client
 , lens-family
@@ -14,6 +15,7 @@ mkDerivation {
   src = ../pyroscope-ghc;
   libraryHaskellDepends = [
     base
+    bytestring
     ghc-pprof
     http-client
     lens-family

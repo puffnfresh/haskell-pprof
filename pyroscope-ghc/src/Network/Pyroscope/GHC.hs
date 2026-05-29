@@ -9,6 +9,7 @@ module Network.Pyroscope.GHC
     configUploadIntervalSeconds,
     configRequestModifier,
     configOnUploadError,
+    configLabelCollector,
     defaultConfig,
     configFromEnv,
     Pyroscope,
@@ -16,15 +17,17 @@ module Network.Pyroscope.GHC
     stop,
     withPyroscope,
     withPyroscopeEnv,
+    withLabels,
   )
 where
 
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Exception (bracket, mask_)
 import qualified Data.ByteString.Char8 as BS8
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
+import Data.Pprof (Label)
 import Data.Pprof.Time (nowNanos)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -32,6 +35,7 @@ import GHC.Pprof.Live
   ( Profiler,
     RotatedProfiles,
     defaultProfilerConfig,
+    labelCollector,
     newProfiler,
     rotateProfile,
     rotatedBlock,
@@ -42,6 +46,7 @@ import GHC.Pprof.Live
     sampleRateHz,
     stopProfiler,
   )
+import qualified GHC.Pprof.Live.Labels as Labels
 import Lens.Family2 (Lens', (&), (.~), (^.))
 import Network.HTTP.Client
   ( Manager,
@@ -64,36 +69,42 @@ data Config
       !Int
       !(Request -> Request)
       !(P.IngestError -> IO ())
+      !(ThreadId -> IO [Label])
 
 configServerAddress ::
   Lens' Config Text
-configServerAddress f (Config s n h i m e) =
-  (\s' -> Config s' n h i m e) <$> f s
+configServerAddress f (Config s n h i m e l) =
+  (\s' -> Config s' n h i m e l) <$> f s
 
 configApplicationName ::
   Lens' Config Text
-configApplicationName f (Config s n h i m e) =
-  (\n' -> Config s n' h i m e) <$> f n
+configApplicationName f (Config s n h i m e l) =
+  (\n' -> Config s n' h i m e l) <$> f n
 
 configSampleRateHz ::
   Lens' Config Int
-configSampleRateHz f (Config s n h i m e) =
-  (\h' -> Config s n h' i m e) <$> f h
+configSampleRateHz f (Config s n h i m e l) =
+  (\h' -> Config s n h' i m e l) <$> f h
 
 configUploadIntervalSeconds ::
   Lens' Config Int
-configUploadIntervalSeconds f (Config s n h i m e) =
-  (\i' -> Config s n h i' m e) <$> f i
+configUploadIntervalSeconds f (Config s n h i m e l) =
+  (\i' -> Config s n h i' m e l) <$> f i
 
 configRequestModifier ::
   Lens' Config (Request -> Request)
-configRequestModifier f (Config s n h i m e) =
-  (\m' -> Config s n h i m' e) <$> f m
+configRequestModifier f (Config s n h i m e l) =
+  (\m' -> Config s n h i m' e l) <$> f m
 
 configOnUploadError ::
   Lens' Config (P.IngestError -> IO ())
-configOnUploadError f (Config s n h i m e) =
-  Config s n h i m <$> f e
+configOnUploadError f (Config s n h i m e l) =
+  (\e' -> Config s n h i m e' l) <$> f e
+
+configLabelCollector ::
+  Lens' Config (ThreadId -> IO [Label])
+configLabelCollector f (Config s n h i m e l) =
+  Config s n h i m e <$> f l
 
 defaultConfig ::
   Config
@@ -105,6 +116,7 @@ defaultConfig =
     10
     id
     (const (pure ()))
+    (const (pure []))
 
 configFromEnv ::
   IO Config
@@ -153,26 +165,34 @@ data Pyroscope
       Profiler
       (IORef Bool)
       (MVar ())
+      Labels.LabelStore
 
 start ::
   Config ->
   IO Pyroscope
 start config = mask_ $ do
+  store <- Labels.newLabelStore
+  let extraCollector = config ^. configLabelCollector
+      collector tid = do
+        scoped <- Labels.collectLabels store tid
+        extra <- extraCollector tid
+        pure (scoped <> extra)
   let profilerConfig =
         defaultProfilerConfig
           & sampleRateHz .~ (config ^. configSampleRateHz)
+          & labelCollector .~ collector
   profiler <- newProfiler profilerConfig
   mgr <- newManager defaultManagerSettings
   stopRef <- newIORef False
   doneMV <- newEmptyMVar
   startNs <- nowNanos
   _ <- forkIO $ uploaderLoop config profiler mgr stopRef doneMV startNs
-  pure $ Pyroscope profiler stopRef doneMV
+  pure $ Pyroscope profiler stopRef doneMV store
 
 stop ::
   Pyroscope ->
   IO ()
-stop (Pyroscope profiler stopRef doneMV) = do
+stop (Pyroscope profiler stopRef doneMV _) = do
   writeIORef stopRef True
   takeMVar doneMV
   stopProfiler profiler
@@ -190,6 +210,14 @@ withPyroscopeEnv ::
 withPyroscopeEnv k = do
   config <- configFromEnv
   withPyroscope config k
+
+withLabels ::
+  Pyroscope ->
+  [Label] ->
+  IO a ->
+  IO a
+withLabels (Pyroscope _ _ _ store) =
+  Labels.withLabels store
 
 uploaderLoop ::
   Config ->
