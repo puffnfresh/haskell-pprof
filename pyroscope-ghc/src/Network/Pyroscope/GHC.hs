@@ -58,10 +58,9 @@ import Network.HTTP.Client
     Request,
     applyBasicAuth,
     applyBearerAuth,
-    defaultManagerSettings,
-    newManager,
     requestHeaders,
   )
+import Network.HTTP.Client.TLS (newTlsManager)
 import qualified Network.Pyroscope.Client as P
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
@@ -209,7 +208,7 @@ start config = mask_ $ do
           & sampleRateHz .~ (config ^. configSampleRateHz)
           & labelCollector .~ collector
   profiler <- newProfiler profilerConfig
-  mgr <- newManager defaultManagerSettings
+  mgr <- newTlsManager
   stopRef <- newIORef False
   doneMV <- newEmptyMVar
   startNs <- nowNanos

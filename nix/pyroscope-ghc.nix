@@ -4,6 +4,7 @@
 , containers
 , ghc-pprof
 , http-client
+, http-client-tls
 , lens-family
 , lib
 , pprof
@@ -20,6 +21,7 @@ mkDerivation {
     containers
     ghc-pprof
     http-client
+    http-client-tls
     lens-family
     pprof
     pyroscope-client

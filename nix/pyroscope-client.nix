@@ -3,6 +3,7 @@
 , bytestring
 , hedgehog
 , http-client
+, http-client-tls
 , http-types
 , lens-family
 , lib
@@ -16,6 +17,7 @@ mkDerivation {
     base
     bytestring
     http-client
+    http-client-tls
     http-types
     lens-family
     text
