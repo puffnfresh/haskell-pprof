@@ -28,10 +28,9 @@ An additional GHC flag makes the stacks more meaningful:
 
 Both flags must be applied to every package whose frames you want resolved in the profile: your own application, the libraries it links against, and ideally GHC's own boot libraries (`base`, `ghc-internal`, `bytestring`, etc.). The Nix flake in this repository rebuilds GHC with the corresponding `hadrianFlags` so the boot libraries also carry IPE; for non-Nix setups, see the GHC user's guide chapter on info-table profiling.
 
-And other flags are recommended:
+Another flag is recommended:
 
-- `-fno-info-table-map-with-stack` (since GHC 9.10) because `STACK` info tables are the majority of entries in the IPE map, but are only useful for heap-inspection tools like ghc-debug. This flag omits them and reclaims most of the binary size overhead without affecting ghc-pprof.
-- `-fdistinct-constructor-tables-only=XXX` (since GHC 10) reduces binary size again by limiting to the selected constructors. For example, you might be interested in attributing only `Just` and `Right` so provide `-fdistinct-constructor-tables-only=Just,Right` - module names are stripped so just provide the constructor names.
+- `-fdistinct-constructor-tables-only=XXX` (since GHC 10) reduces binary size by limiting to the selected constructors. For example, you might be interested in attributing only `Just` and `Right` so provide `-fdistinct-constructor-tables-only=Just,Right` - module names are stripped so just provide the constructor names.
 
 ## Libraries
 
