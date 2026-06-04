@@ -39,7 +39,7 @@ import GHC.Pprof.Live.Internal
   ( StackCounters (..),
     addCounters,
     classifyStatus,
-    toFrame,
+    stackEntriesToFrames,
   )
 import GHC.Stack.CloneStack (StackEntry, cloneThreadStack, decode)
 
@@ -240,7 +240,7 @@ sampleOne samplesRef collect self tid =
     recordEntries bucket entries =
       unless (null entries) $ do
         labels <- collect tid
-        let key = StackKey (map toFrame entries) labels
+        let key = StackKey (stackEntriesToFrames entries) labels
         atomicModifyIORef' samplesRef $ \m ->
           (Map.insertWith addCounters key bucket m, ())
 

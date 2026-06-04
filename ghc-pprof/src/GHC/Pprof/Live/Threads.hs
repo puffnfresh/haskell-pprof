@@ -12,7 +12,7 @@ import Data.Pprof (Frame (..), ProfileMeta (..), addSample, encodeGzipped)
 import Data.Pprof.Time (nowNanos)
 import qualified Data.Text as T
 import GHC.Conc.Sync (ThreadId, listThreads, threadLabel)
-import GHC.Pprof.Live.Internal (toFrame)
+import GHC.Pprof.Live.Internal (stackEntriesToFrames)
 import GHC.Stack.CloneStack (cloneThreadStack, decode)
 
 captureThreadProfile ::
@@ -45,4 +45,4 @@ captureStack tid = do
       threadFrame =
         Frame (T.pack "Thread") threadName (T.pack "") 0
   r <- try (cloneThreadStack tid >>= decode)
-  pure $ either (\(_ :: SomeException) -> []) (map toFrame) r ++ [threadFrame]
+  pure $ either (\(_ :: SomeException) -> []) stackEntriesToFrames r ++ [threadFrame]

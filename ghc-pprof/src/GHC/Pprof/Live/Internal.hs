@@ -5,6 +5,7 @@ module GHC.Pprof.Live.Internal
     classifyStatus,
     parseSrcLoc,
     toFrame,
+    stackEntriesToFrames,
   )
 where
 
@@ -85,3 +86,9 @@ toFrame se =
     line
   where
     (file, line) = parseSrcLoc (srcLoc se)
+
+stackEntriesToFrames ::
+  [StackEntry] ->
+  [Frame]
+stackEntriesToFrames =
+  reverse . map toFrame
