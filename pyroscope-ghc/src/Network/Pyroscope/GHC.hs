@@ -41,6 +41,7 @@ import GHC.Pprof.Live
     RotatedProfiles,
     defaultProfilerConfig,
     entryFilter,
+    excludeAnonymousInternal,
     excludeCmm,
     labelCollector,
     newProfiler,
@@ -138,7 +139,7 @@ defaultConfig =
     (const (pure ()))
     openTelemetryLabels
     Map.empty
-    excludeCmm
+    (\se -> excludeCmm se && excludeAnonymousInternal se)
 
 configFromEnv ::
   IO Config

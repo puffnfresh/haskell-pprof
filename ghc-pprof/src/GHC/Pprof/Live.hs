@@ -7,6 +7,7 @@ module GHC.Pprof.Live
     labelCollector,
     entryFilter,
     excludeCmm,
+    excludeAnonymousInternal,
     ThreadSelector (..),
     defaultProfilerConfig,
     Profiler,
@@ -99,6 +100,12 @@ excludeCmm ::
   Bool
 excludeCmm se =
   not ("Cmm$" `isPrefixOf` moduleName se)
+
+excludeAnonymousInternal ::
+  StackEntry ->
+  Bool
+excludeAnonymousInternal se =
+  not (functionName se == "$" && "GHC.Internal." `isPrefixOf` moduleName se)
 
 data StackKey
   = StackKey [Frame] [Label]
