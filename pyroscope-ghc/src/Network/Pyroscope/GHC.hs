@@ -11,6 +11,7 @@ module Network.Pyroscope.GHC
     configOnUploadError,
     configLabelCollector,
     configTags,
+    configEntryFilter,
     defaultConfig,
     configFromEnv,
     Pyroscope,
@@ -39,6 +40,8 @@ import GHC.Pprof.Live
   ( Profiler,
     RotatedProfiles,
     defaultProfilerConfig,
+    entryFilter,
+    excludeCmm,
     labelCollector,
     newProfiler,
     rotateProfile,
@@ -52,6 +55,7 @@ import GHC.Pprof.Live
   )
 import qualified GHC.Pprof.Live.Labels as Labels
 import GHC.Pprof.Live.OpenTelemetry (openTelemetryLabels)
+import GHC.Stack.CloneStack (StackEntry)
 import Lens.Family2 (Lens', (&), (.~), (^.))
 import Network.HTTP.Client
   ( Manager,
@@ -75,46 +79,52 @@ data Config
       !(P.IngestError -> IO ())
       !(ThreadId -> IO [Label])
       !(Map Text Text)
+      !(StackEntry -> Bool)
 
 configServerAddress ::
   Lens' Config Text
-configServerAddress f (Config s n h i m e l t) =
-  (\s' -> Config s' n h i m e l t) <$> f s
+configServerAddress f (Config s n h i m e l t x) =
+  (\s' -> Config s' n h i m e l t x) <$> f s
 
 configApplicationName ::
   Lens' Config Text
-configApplicationName f (Config s n h i m e l t) =
-  (\n' -> Config s n' h i m e l t) <$> f n
+configApplicationName f (Config s n h i m e l t x) =
+  (\n' -> Config s n' h i m e l t x) <$> f n
 
 configSampleRateHz ::
   Lens' Config Int
-configSampleRateHz f (Config s n h i m e l t) =
-  (\h' -> Config s n h' i m e l t) <$> f h
+configSampleRateHz f (Config s n h i m e l t x) =
+  (\h' -> Config s n h' i m e l t x) <$> f h
 
 configUploadIntervalSeconds ::
   Lens' Config Int
-configUploadIntervalSeconds f (Config s n h i m e l t) =
-  (\i' -> Config s n h i' m e l t) <$> f i
+configUploadIntervalSeconds f (Config s n h i m e l t x) =
+  (\i' -> Config s n h i' m e l t x) <$> f i
 
 configRequestModifier ::
   Lens' Config (Request -> Request)
-configRequestModifier f (Config s n h i m e l t) =
-  (\m' -> Config s n h i m' e l t) <$> f m
+configRequestModifier f (Config s n h i m e l t x) =
+  (\m' -> Config s n h i m' e l t x) <$> f m
 
 configOnUploadError ::
   Lens' Config (P.IngestError -> IO ())
-configOnUploadError f (Config s n h i m e l t) =
-  (\e' -> Config s n h i m e' l t) <$> f e
+configOnUploadError f (Config s n h i m e l t x) =
+  (\e' -> Config s n h i m e' l t x) <$> f e
 
 configLabelCollector ::
   Lens' Config (ThreadId -> IO [Label])
-configLabelCollector f (Config s n h i m e l t) =
-  (\l' -> Config s n h i m e l' t) <$> f l
+configLabelCollector f (Config s n h i m e l t x) =
+  (\l' -> Config s n h i m e l' t x) <$> f l
 
 configTags ::
   Lens' Config (Map Text Text)
-configTags f (Config s n h i m e l t) =
-  Config s n h i m e l <$> f t
+configTags f (Config s n h i m e l t x) =
+  (\t' -> Config s n h i m e l t' x) <$> f t
+
+configEntryFilter ::
+  Lens' Config (StackEntry -> Bool)
+configEntryFilter f (Config s n h i m e l t x) =
+  Config s n h i m e l t <$> f x
 
 defaultConfig ::
   Config
@@ -128,6 +138,7 @@ defaultConfig =
     (const (pure ()))
     openTelemetryLabels
     Map.empty
+    excludeCmm
 
 configFromEnv ::
   IO Config
@@ -207,6 +218,7 @@ start config = mask_ $ do
         defaultProfilerConfig
           & sampleRateHz .~ (config ^. configSampleRateHz)
           & labelCollector .~ collector
+          & entryFilter .~ (config ^. configEntryFilter)
   profiler <- newProfiler profilerConfig
   mgr <- newTlsManager
   stopRef <- newIORef False

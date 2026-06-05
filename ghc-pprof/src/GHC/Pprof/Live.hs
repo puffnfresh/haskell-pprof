@@ -5,6 +5,8 @@ module GHC.Pprof.Live
     sampleRateHz,
     threadSelector,
     labelCollector,
+    entryFilter,
+    excludeCmm,
     ThreadSelector (..),
     defaultProfilerConfig,
     Profiler,
@@ -29,9 +31,10 @@ import Data.ByteString (ByteString)
 import Data.Foldable (traverse_)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
 import Data.Int (Int64)
+import Data.List (isPrefixOf)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Pprof (Frame (..), Label, ProfileMeta (..), addSample, encodeGzipped)
+import Data.Pprof (Frame, Label, ProfileMeta (..), addSample, encodeGzipped)
 import Data.Pprof.Time (nowNanos)
 import Data.Text (Text)
 import GHC.Conc.Sync (listThreads, threadStatus)
@@ -41,7 +44,7 @@ import GHC.Pprof.Live.Internal
     classifyStatus,
     stackEntriesToFrames,
   )
-import GHC.Stack.CloneStack (StackEntry, cloneThreadStack, decode)
+import GHC.Stack.CloneStack (StackEntry (..), cloneThreadStack, decode)
 
 data ThreadSelector
   = AllThreads
@@ -52,35 +55,50 @@ data ProfilerConfig
       Int
       ThreadSelector
       (ThreadId -> IO [Label])
+      (StackEntry -> Bool)
 
 sampleRateHz ::
   (Functor f) =>
   (Int -> f Int) ->
   ProfilerConfig ->
   f ProfilerConfig
-sampleRateHz f (ProfilerConfig hz sel col) =
-  (\hz' -> ProfilerConfig hz' sel col) <$> f hz
+sampleRateHz f (ProfilerConfig hz sel col flt) =
+  (\hz' -> ProfilerConfig hz' sel col flt) <$> f hz
 
 threadSelector ::
   (Functor f) =>
   (ThreadSelector -> f ThreadSelector) ->
   ProfilerConfig ->
   f ProfilerConfig
-threadSelector f (ProfilerConfig hz sel col) =
-  (\sel' -> ProfilerConfig hz sel' col) <$> f sel
+threadSelector f (ProfilerConfig hz sel col flt) =
+  (\sel' -> ProfilerConfig hz sel' col flt) <$> f sel
 
 labelCollector ::
   (Functor f) =>
   ((ThreadId -> IO [Label]) -> f (ThreadId -> IO [Label])) ->
   ProfilerConfig ->
   f ProfilerConfig
-labelCollector f (ProfilerConfig hz sel col) =
-  (\col' -> ProfilerConfig hz sel col') <$> f col
+labelCollector f (ProfilerConfig hz sel col flt) =
+  (\col' -> ProfilerConfig hz sel col' flt) <$> f col
+
+entryFilter ::
+  (Functor f) =>
+  ((StackEntry -> Bool) -> f (StackEntry -> Bool)) ->
+  ProfilerConfig ->
+  f ProfilerConfig
+entryFilter f (ProfilerConfig hz sel col flt) =
+  ProfilerConfig hz sel col <$> f flt
 
 defaultProfilerConfig ::
   ProfilerConfig
 defaultProfilerConfig =
-  ProfilerConfig 100 AllThreads (const (pure []))
+  ProfilerConfig 100 AllThreads (const (pure [])) (const True)
+
+excludeCmm ::
+  StackEntry ->
+  Bool
+excludeCmm se =
+  not ("Cmm$" `isPrefixOf` moduleName se)
 
 data StackKey
   = StackKey [Frame] [Label]
@@ -97,13 +115,13 @@ data Profiler
 newProfiler ::
   ProfilerConfig ->
   IO Profiler
-newProfiler (ProfilerConfig hz sel col) =
+newProfiler (ProfilerConfig hz sel col flt) =
   mask_ $ do
     samplesRef <- newIORef Map.empty
     startRef <- nowNanos >>= newIORef
     stopRef <- newIORef False
     stoppedMV <- newEmptyMVar
-    _ <- forkIO $ samplerLoop listTids col periodNanos samplesRef stopRef stoppedMV
+    _ <- forkIO $ samplerLoop listTids col flt periodNanos samplesRef stopRef stoppedMV
     pure $
       Profiler
         samplesRef
@@ -203,12 +221,13 @@ rotateProfile (Profiler samples winStart _ _ period) = do
 samplerLoop ::
   IO [ThreadId] ->
   (ThreadId -> IO [Label]) ->
+  (StackEntry -> Bool) ->
   Int ->
   IORef (Map StackKey StackCounters) ->
   IORef Bool ->
   MVar () ->
   IO ()
-samplerLoop listTids collect periodNanos samplesRef stopRef stoppedMV = do
+samplerLoop listTids collect keep periodNanos samplesRef stopRef stoppedMV = do
   self <- myThreadId
   let delayMicros =
         max 1 (periodNanos `div` 1000)
@@ -218,7 +237,7 @@ samplerLoop listTids collect periodNanos samplesRef stopRef stoppedMV = do
           then putMVar stoppedMV ()
           else do
             tids <- listTids
-            forM_ tids $ sampleOne samplesRef collect self
+            forM_ tids $ sampleOne samplesRef collect keep self
             threadDelay delayMicros
             loop
   loop
@@ -226,10 +245,11 @@ samplerLoop listTids collect periodNanos samplesRef stopRef stoppedMV = do
 sampleOne ::
   IORef (Map StackKey StackCounters) ->
   (ThreadId -> IO [Label]) ->
+  (StackEntry -> Bool) ->
   ThreadId ->
   ThreadId ->
   IO ()
-sampleOne samplesRef collect self tid =
+sampleOne samplesRef collect keep self tid =
   unless (tid == self) $ do
     status <- threadStatus tid
     traverse_ recordBucket (classifyStatus status)
@@ -237,10 +257,11 @@ sampleOne samplesRef collect self tid =
     recordBucket bucket = do
       r <- try (cloneThreadStack tid >>= decode)
       traverse_ (recordEntries bucket) (r :: Either SomeException [StackEntry])
-    recordEntries bucket entries =
-      unless (null entries) $ do
+    recordEntries bucket entries = do
+      let frames = stackEntriesToFrames (filter keep entries)
+      unless (null frames) $ do
         labels <- collect tid
-        let key = StackKey (stackEntriesToFrames entries) labels
+        let key = StackKey frames labels
         atomicModifyIORef' samplesRef $ \m ->
           (Map.insertWith addCounters key bucket m, ())
 

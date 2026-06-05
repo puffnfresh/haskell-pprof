@@ -27,13 +27,7 @@ agent ::
 agent seconds = do
   errors <- newIORef (0 :: Int)
   base <- Pyro.configFromEnv
-  let config =
-        base
-          & Pyro.configOnUploadError
-          .~ ( \e -> do
-                 putStrLn ("upload error: " <> show e)
-                 atomicModifyIORef' errors (\n -> (n + 1, ()))
-             )
+  let config = base & Pyro.configOnUploadError .~ onError errors
   Pyro.withPyroscope config $ \_ -> do
     start <- nowNanos
     let deadline = start + fromIntegral seconds * oneSecondNanos
@@ -42,6 +36,10 @@ agent seconds = do
   when (errorCount > 0) $
     die ("had " <> show errorCount <> " upload errors")
   putStrLn "agent done"
+  where
+    onError errors e = do
+      putStrLn ("upload error: " <> show e)
+      atomicModifyIORef' errors (\n -> (n + 1, ()))
 
 busyUntil ::
   Int64 ->
